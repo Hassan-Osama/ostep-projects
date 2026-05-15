@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <pthread.h>
 #include "request.h"
 #include "io_helper.h"
 #include "buffer.h"
@@ -8,6 +9,18 @@ char default_root[] = ".";
 //
 // ./wserver [-d <basedir>] [-p <portnum>] 
 // 
+
+void *worker_thread_loop(void *arg){
+	int id = *((int *)arg);
+	free(arg);
+	while(1){
+		int conn_fd= buffer_get();
+		printf("Worker [%d] received connection [%d]\n", id, conn_fd);
+		request_handle(conn_fd);
+		close_or_die(conn_fd);
+	}
+}
+
 int main(int argc, char *argv[]) {
     int c;
     char *root_dir = default_root;
@@ -52,17 +65,23 @@ int main(int argc, char *argv[]) {
 
 	buffer_init(buffers);
 
+	pthread_t pool[threads];
+	for(int i=0;i<threads;i++){
+		int *id = (int *)malloc(sizeof(int));
+		*id = i;
+		pthread_create(&pool[i], NULL, worker_thread_loop, id);
+	}
+
     // run out of this directory
     chdir_or_die(root_dir);
 
     // now, get to work
     int listen_fd = open_listen_fd_or_die(port);
     while (1) {
-	struct sockaddr_in client_addr;
-	int client_len = sizeof(client_addr);
-	int conn_fd = accept_or_die(listen_fd, (sockaddr_t *) &client_addr, (socklen_t *) &client_len);
-	request_handle(conn_fd);
-	close_or_die(conn_fd);
+		struct sockaddr_in client_addr;
+		int client_len = sizeof(client_addr);
+		int conn_fd = accept_or_die(listen_fd, (sockaddr_t *) &client_addr, (socklen_t *) &client_len);
+		buffer_put(conn_fd);
     }
     return 0;
 }
