@@ -1,23 +1,11 @@
+# wzip
 
-In this directory, you should write the program `wzip.c` and compile it into
-the binary `wzip` (e.g., `gcc -o wzip wzip.c -Wall -Werror`).
+A simple file compression utility using run-length encoding (RLE).
 
-After doing so, you can run the tests from this directory by running the
-`test-wzip.sh` script. If all goes well, you will see:
+The program compresses a stream of characters into a compact binary format. Consecutive identical characters are replaced by a 4-byte binary integer representing the count, followed by the single ASCII character.
 
-```sh
-prompt> ./test-wzip.sh
-test 1: passed
-test 2: passed
-test 3: passed
-test 4: passed
-test 5: passed
-test 6: passed
-prompt>
-```
-
-The `test-wzip.sh` script is just a wrapper for the `run-tests.sh` script in
-the `tester` directory of this repository. This program has a few options; see
-the relevant
-[README](https://github.com/remzi-arpacidusseau/ostep-projects/blob/master/tester/README.md)
-for details.
+### Features
+- Implements Run-Length Encoding (RLE) for basic text compression.
+- Supports multiple input files, compressing them into a single continuous output stream.
+- Outputs binary data directly to standard output.
+- Uses `fread()` and `fwrite()` for efficient character-by-character processing and binary output.

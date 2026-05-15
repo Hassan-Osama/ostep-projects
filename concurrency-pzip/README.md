@@ -1,95 +1,38 @@
+# Parallel Zip (pzip)
 
-# Parallel Zip
+This directory contains a high-performance parallel implementation of a Run-Length Encoding (RLE) compression tool, `pzip`. It leverages multi-core processors to significantly speed up the compression of large files.
 
-In an earlier project, you implemented a simple compression tool based on
-run-length encoding, known simply as `zip`. Here, you'll implement something
-similar, except you'll use threads to make a parallel version of `zip`. We'll
-call this version ... wait for it ... `pzip`. 
+## Features
 
-There are three specific objectives to this assignment:
+- **Parallel Compression**: Divides the input file into multiple chunks and processes them in parallel using a pool of worker threads.
+- **Dynamic Thread Scaling**: Automatically detects the number of available CPU cores using `sysconf(_SC_NPROCESSORS_ONLN)` to optimize thread count.
+- **Memory-Mapped I/O**: Uses `mmap()` to map input files into the process's address space, enabling fast and efficient access to data.
+- **Producer-Consumer Model**: Employs a synchronized `TaskQueue` to manage work distribution between the master thread and worker threads.
+- **Ordered Output & Merging**: Carefully merges RLE runs that span across chunk boundaries and ensures that the compressed output is written to `stdout` in the correct sequence.
+- **Synchronization**: Uses POSIX mutexes and condition variables to manage access to shared data structures and signal task completion.
 
-* To familiarize yourself with the Linux pthreads.
-* To learn how to parallelize a program.
-* To learn how to program for high performance.
+## Implementation Details
 
-## Background
+The implementation in `pzip.c` follows these steps:
+1. **Mapping**: The input file is opened and memory-mapped.
+2. **Task Distribution**: The file is partitioned into chunks. The master thread pushes these "Tasks" (pointers to chunk start and size) into a thread-safe queue.
+3. **Worker Processing**: Worker threads pop tasks from the queue, perform RLE compression on their assigned chunk, and store the resulting `RLERun` arrays in a shared `results_array`.
+4. **Result Collection**: The main thread waits for each chunk to be completed in order. It iterates through the compressed runs, merging the last run of one chunk with the first run of the next if the characters match.
+5. **Output**: The merged RLE runs (4-byte count followed by 1-byte character) are written to `stdout`.
 
-To understand how to make progress on this project, you should first
-understand the basics of thread creation, and perhaps locking and signaling
-via mutex locks and condition variables. These are described in the following
-book chapters:
+## Building and Running
 
-- [Intro to Threads](http://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf)
-- [Threads API](http://pages.cs.wisc.edu/~remzi/OSTEP/threads-api.pdf)
-- [Locks](http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks.pdf)
-- [Using Locks](http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf)
-- [Condition Variables](http://pages.cs.wisc.edu/~remzi/OSTEP/threads-cv.pdf)
-
-Read these chapters carefully in order to prepare yourself for this project.
-
-## Overview
-
-First, recall how `zip` works by reading the description
-[here](https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/initial-utilities). 
-You'll use the same basic specification, with run-length encoding as the basic
-technique.
-
-Your parallel zip (`pzip`) will externally look the same; the general usage
-from the command line will be as follows:
-
-```
-prompt> ./pzip file > file.z
+### Compilation
+Compile the project using `gcc` with the optimizer enabled for maximum performance:
+```bash
+gcc pzip.c -o pzip -Wall -Werror -pthread -O3
 ```
 
-As before, there may be many input files (not just one, as above). However,
-internally, the program will use POSIX threads to parallelize the compression
-process.  
+### Running pzip
+Run `pzip` by passing the input file path. Redirect the output to a file if you wish to save the compressed data:
+```bash
+./pzip input_file > output_file.z
+```
 
-## Considerations
-
-Doing so effectively and with high performance will require you to address (at
-least) the following issues:
-
-- **How to parallelize the compression.** Of course, the central challenge of
-    this project is to parallelize the compression process. Think about what
-    can be done in parallel, and what must be done serially by a single
-    thread, and design your parallel zip as appropriate.
-
-    One interesting issue that the "best" implementations will handle is this:
-    what happens if one thread runs more slowly than another? Does the
-    compression give more work to faster threads? 
-
-- **How to determine how many threads to create.** On Linux, this means using
-    interfaces like `get_nprocs()` and `get_nprocs_conf()`; read the man pages
-    for more details. Then, create threads to match the number of CPU
-    resources available.
-
-- **How to efficiently perform each piece of work.** While parallelization
-    will yield speed up, each thread's efficiency in performing the
-    compression is also of critical importance. Thus, making the core
-    compression loop as CPU efficient as possible is needed for high
-    performance. 
-
-- **How to access the input file efficiently.** On Linux, there are many ways
-    to read from a file, including C standard library calls like `fread()` and
-    raw system calls like `read()`. One particularly efficient way is to use
-    memory-mapped files, available via `mmap()`. By mapping the input file
-    into the address space, you can then access bytes of the input file via
-    pointers and do so quite efficiently. 
-
-
-## Grading
-
-Your code should compile (and should be compiled) with the following flags:
-`-Wall -Werror -pthread -O`. The last one is important: it turns on the
-optimizer! In fact, for fun, try timing your code with and without `-O` and
-marvel at the difference.
-
-Your code will first be measured for correctness, ensuring that it zips input
-files correctly.
-
-If you pass the correctness tests, your code will be tested for performance;
-higher performance will lead to better scores.
-
-
-
+## Performance Note
+Using the `-O3` flag during compilation is highly recommended as it allows the compiler to optimize the core compression loop, significantly improving throughput on large datasets.

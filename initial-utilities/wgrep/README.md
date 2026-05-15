@@ -1,24 +1,11 @@
+# wgrep
 
-In this directory, you should write the program `wgrep.c` and compile it into
-the binary `wgrep` (e.g., `gcc -o wgrep wgrep.c -Wall -Werror`).
+A simple implementation of the UNIX `grep` utility.
 
-After doing so, you can run the tests from this directory by running the
-`test-wgrep.sh` script. If all goes well, you will see:
+The program searches for a specified search term in one or more files and prints any lines that contain a match. If no files are specified, it searches standard input (`stdin`).
 
-```sh
-prompt> ./test-wgrep.sh
-test 1: passed
-test 2: passed
-test 3: passed
-test 4: passed
-test 5: passed
-test 6: passed
-test 7: passed
-prompt>
-```
-
-The `test-wgrep.sh` script is just a wrapper for the `run-tests.sh` script in
-the `tester` directory of this repository. This program has a few options; see
-the relevant
-[README](https://github.com/remzi-arpacidusseau/ostep-projects/blob/master/tester/README.md)
-for details.
+### Implementation Details
+- Uses `getline()` to handle arbitrarily long lines of text efficiently.
+- Uses `strstr()` for case-sensitive string matching.
+- Handles file access errors by printing `wgrep: cannot open file` and exiting with status `1`.
+- If no command-line arguments are provided, it prints usage instructions and exits with status `1`.

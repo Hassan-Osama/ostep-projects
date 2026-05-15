@@ -1,23 +1,10 @@
+# wunzip
 
-In this directory, you should write the program `wunzip.c` and compile it into
-the binary `wunzip` (e.g., `gcc -o wunzip wunzip.c -Wall -Werror`).
+A decompression utility for files compressed with `wzip`.
 
-After doing so, you can run the tests from this directory by running the
-`test-wunzip.sh` script. If all goes well, you will see:
+The program reverses the run-length encoding (RLE) performed by `wzip`. It reads 5-byte entries (a 4-byte integer count and a 1-byte character) and outputs the original characters to standard output.
 
-```sh
-prompt> ./test-wunzip.sh
-test 1: passed
-test 2: passed
-test 3: passed
-test 4: passed
-test 5: passed
-test 6: passed
-prompt>
-```
-
-The `test-wunzip.sh` script is just a wrapper for the `run-tests.sh` script in
-the `tester` directory of this repository. This program has a few options; see
-the relevant
-[README](https://github.com/remzi-arpacidusseau/ostep-projects/blob/master/tester/README.md)
-for details.
+### Implementation Details
+- Reads compressed binary data using `fread()`.
+- Expands the RLE format back to the original uncompressed text.
+- Supports multiple compressed files provided as command-line arguments.
