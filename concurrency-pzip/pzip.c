@@ -9,6 +9,8 @@
 #include <pthread.h>
 #include <time.h>
 
+#define CHUNK_SIZE (1024 * 1024) // 1MB
+
 typedef struct {
     uint32_t count;
     char c;
@@ -38,7 +40,8 @@ typedef struct{
     int cnt;
     int capacity;
     pthread_mutex_t lock;
-    pthread_cond_t cond;
+    pthread_cond_t fill_cond;
+    pthread_cond_t empty_cond;
 }TaskQueue;
 
 void queue_init(TaskQueue *q, int capacity){
@@ -48,26 +51,31 @@ void queue_init(TaskQueue *q, int capacity){
     q->cnt = 0;
     q->capacity = capacity;
     pthread_mutex_init(&q->lock, NULL);
-    pthread_cond_init(&q->cond, NULL);
+    pthread_cond_init(&q->fill_cond, NULL);
+    pthread_cond_init(&q->empty_cond, NULL);
 }
 
 void queue_push(TaskQueue *q, Task t){
     pthread_mutex_lock(&q->lock);
+    while(q->cnt == q->capacity){
+        pthread_cond_wait(&q->empty_cond, &q->lock);
+    }
     q->tasks[q->tail] = t;
     q->tail = (q->tail + 1) % q->capacity;
     q->cnt++;
-    pthread_cond_signal(&q->cond);
+    pthread_cond_signal(&q->fill_cond);
     pthread_mutex_unlock(&q->lock);
 }
 
 Task queue_pop(TaskQueue *q){
     pthread_mutex_lock(&q->lock);
     while(q->cnt == 0){
-        pthread_cond_wait(&q->cond, &q->lock);
+        pthread_cond_wait(&q->fill_cond, &q->lock);
     }
     Task ret = q->tasks[q->head];
     q->head = (q->head + 1) % q->capacity;
     q->cnt--;
+    pthread_cond_signal(&q->empty_cond);
     pthread_mutex_unlock(&q->lock);
     return ret;
 }
@@ -75,7 +83,8 @@ Task queue_pop(TaskQueue *q){
 void queue_destroy(TaskQueue *q){
     free(q->tasks);
     pthread_mutex_destroy(&q->lock);
-    pthread_cond_destroy(&q->cond);
+    pthread_cond_destroy(&q->fill_cond);
+    pthread_cond_destroy(&q->empty_cond);
 }
 
 
@@ -174,25 +183,20 @@ int main(int argc, char* argv[]){
     TaskQueue queue;
     queue_init(&queue, nprocs * 2);
 
-    size_t chunk_size = file_size / nprocs;
-    size_t remainder = file_size % nprocs;
-    results_array = calloc(nprocs, sizeof(ChunkResult));
+    int num_tasks = (file_size + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    results_array = calloc(num_tasks, sizeof(ChunkResult));
     pthread_t *pool = malloc(nprocs * sizeof(pthread_t));
     for(int i=0;i<nprocs;i++){
         pthread_create(&pool[i], NULL, worker_routine, &queue);
     }
     size_t current_offset = 0;
-    int tasks_created = 0;
-    for(int i=0;i<nprocs;i++){
+    for(int i=0;i<num_tasks;i++){
         Task t;
         t.chunk_id = i;
         t.start_ptr = data+current_offset;
-        t.size = chunk_size + (i==nprocs-1?remainder: 0);
-        if(t.size>0){
-            queue_push(&queue, t);
-            current_offset += t.size;
-            tasks_created++;
-        }
+        t.size = (current_offset + CHUNK_SIZE <= file_size) ? CHUNK_SIZE : file_size - current_offset;
+        queue_push(&queue, t);
+        current_offset += t.size;
     }
     for(int i = 0; i < nprocs; i++) {
         Task pill;
@@ -203,7 +207,7 @@ int main(int argc, char* argv[]){
     char pending_char = '\0';
     int has_pending = 0;
 
-    for(int i=0;i<tasks_created;i++){
+    for(int i=0;i<num_tasks;i++){
         pthread_mutex_lock(&results_lock);
         while (results_array[i].completed == 0) {
             pthread_cond_wait(&results_cond, &results_lock);
