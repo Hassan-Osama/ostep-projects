@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <time.h>
 
 typedef struct {
     uint32_t count;
@@ -165,7 +166,10 @@ int main(int argc, char* argv[]){
     close(f);
 
     int nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    printf("[system] Detected %d CPU cores\n", nprocs);
+    fprintf(stderr, "[system] Detected %d CPU cores\n", nprocs);
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     TaskQueue queue;
     queue_init(&queue, nprocs * 2);
@@ -226,6 +230,12 @@ int main(int argc, char* argv[]){
     if (has_pending) {
         write_run(pending_count, pending_char);
     }
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double time_taken = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+    fprintf(stderr, "[benchmark] Time: %.4f s\n", time_taken);
+    fprintf(stderr, "[benchmark] Throughput: %.2f MB/s\n", (file_size / 1024.0 / 1024.0) / time_taken);
+
     for(int i = 0; i < nprocs; i++) {
         pthread_join(pool[i], NULL);
     }

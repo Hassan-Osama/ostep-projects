@@ -10,6 +10,7 @@ This directory contains a high-performance parallel implementation of a Run-Leng
 - **Producer-Consumer Model**: Employs a synchronized `TaskQueue` to manage work distribution between the master thread and worker threads.
 - **Ordered Output & Merging**: Carefully merges RLE runs that span across chunk boundaries and ensures that the compressed output is written to `stdout` in the correct sequence.
 - **Synchronization**: Uses POSIX mutexes and condition variables to manage access to shared data structures and signal task completion.
+- **Built-in Benchmarking**: Includes a nanosecond-resolution timer to report execution time and throughput (MB/s) to `stderr`.
 
 ## Implementation Details
 
@@ -32,6 +33,16 @@ gcc pzip.c -o pzip -Wall -Werror -pthread -O3
 Run `pzip` by passing the input file path. Redirect the output to a file if you wish to save the compressed data:
 ```bash
 ./pzip input_file > output_file.z
+```
+
+## Benchmarking
+
+The tool automatically outputs performance metrics to `stderr` upon completion. This includes the number of cores detected, the total time taken for compression, and the processing throughput:
+
+```text
+[system] Detected 8 CPU cores
+[benchmark] Time: 0.1852 s
+[benchmark] Throughput: 539.85 MB/s
 ```
 
 ## Performance Note
